@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShopEasy — Products</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="navbar">
+    <h1 class="logo">ShopEasy</h1>
+    <nav>
+      <span id="userGreeting"></span>
+      <a href="login.html" id="loginLink">Login</a>
+      <a href="register.html" id="registerLink">Register</a>
+      <a href="cart.html">Cart <span id="cartBadge" class="cart-badge"></span></a>
+      <a href="myorders.html">My Orders</a>
+      <a href="admin.html" id="adminLink" style="display:none;">Admin Panel</a>
+<a href="#" id="logoutLink" style="display:none;">Logout</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2 class="page-title">Our Products</h2>
+    <div id="productGrid" class="product-grid">
+      <p id="loadingMsg">Loading products...</p>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

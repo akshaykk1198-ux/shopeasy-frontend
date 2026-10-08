@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShopEasy — Admin Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="navbar">
+    <h1 class="logo">ShopEasy</h1>
+    <nav>
+      <span id="userGreeting"></span>
+      <a href="index.html">Products</a>
+      <a href="myorders.html">My Orders</a>
+      <a href="#" id="logoutLink" style="display:none;">Logout</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2 class="page-title">Admin Panel</h2>
+
+    <div id="adminGuard"></div>
+
+    <div id="adminContent" style="display:none;">
+      <div class="admin-form-card">
+        <h3 id="formTitle">Add New Product</h3>
+        <form id="productForm">
+          <input type="hidden" id="productId">
+          <input type="text" id="p_name" placeholder="Product Name" required>
+          <textarea id="p_description" placeholder="Description" rows="2"></textarea>
+          <input type="number" id="p_price" placeholder="Price (₹)" required min="0">
+          <input type="text" id="p_category" placeholder="Category">
+          <input type="number" id="p_stock" placeholder="Stock" min="0">
+          <input type="text" id="p_imageUrl" placeholder="Image URL">
+          <div class="admin-form-actions">
+            <button type="submit" id="submitBtn">Add Product</button>
+            <button type="button" id="cancelEditBtn" style="display:none;">Cancel</button>
+          </div>
+        </form>
+        <p class="form-message" id="adminMessage"></p>
+      </div>
+
+      <h3 class="admin-list-title">Existing Products</h3>
+      <div id="adminProductList" class="admin-product-list"></div>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
