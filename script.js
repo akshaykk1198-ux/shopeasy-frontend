@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:5000/api';
+const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const API_BASE = IS_LOCAL
+  ? 'http://localhost:5000/api'
+  : 'https://shopeasy-api-zeq2.onrender.com/api';
 const RAZORPAY_KEY_ID = 'rzp_test_TdvtILWPKwz4zp'; // replace with your actual Key ID
 
 // ---------- Navbar ----------
