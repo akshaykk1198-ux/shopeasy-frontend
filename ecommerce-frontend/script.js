@@ -1,4 +1,4 @@
-const API_BASE = 'https://shopeasy-api-zeq2.onrender.com/api'; // Or 'http://localhost:5000/api' for local testing
+const API_BASE = 'https://shopeasy-api-zeq2.onrender.com/api';
 
 let allProducts = [];
 
@@ -38,7 +38,7 @@ function displayProducts(products) {
   `).join('');
 }
 
-// ---------- Search Bar Logic ----------
+// ---------- Search Bar Logic (Filters products as you type) ----------
 const searchInput = document.getElementById('searchInput');
 if (searchInput) {
   searchInput.addEventListener('input', (e) => {
