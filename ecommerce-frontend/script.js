@@ -26,17 +26,27 @@ function displayProducts(products) {
     return;
   }
 
-  grid.innerHTML = products.map(p => `
-    <div class="product-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-      ${p.image ? `<img src="${p.image}" alt="${p.name}" style="width: 100%; height: 160px; object-fit: cover; border-radius: 6px;">` : ''}
-      <h3 style="font-size: 18px; font-weight: 600;">${p.name}</h3>
-      <p style="color: #4b5563; font-size: 14px;">${p.description || 'No description available.'}</p>
-      <div style="font-weight: bold; color: #111827;">₹${p.price}</div>
-      <div style="font-size: 12px; color: ${p.stock > 0 ? '#059669' : '#dc2626'};">
-        ${p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}
+  grid.innerHTML = products.map(p => {
+    // Check for image or imageUrl properties, fallback to a placeholder if none exists
+    const imgSrc = p.image || p.imageUrl || 'https://via.placeholder.com/300x160?text=No+Image';
+
+    return `
+      <div class="product-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px; justify-content: space-between;">
+        <div>
+          <img src="${imgSrc}" alt="${p.name}" style="width: 100%; height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+          <h3 style="font-size: 18px; font-weight: 600;">${p.name}</h3>
+          <p style="color: #4b5563; font-size: 14px; margin: 4px 0;">${p.description || 'No description available.'}</p>
+          <div style="font-weight: bold; color: #111827; font-size: 16px; margin: 4px 0;">₹${p.price}</div>
+          <div style="font-size: 12px; color: ${p.stock > 0 ? '#059669' : '#dc2626'}; margin-bottom: 8px;">
+            ${p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}
+          </div>
+        </div>
+        <button onclick="addToCart('${p._id || p.id}')" style="background: #2563eb; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%;">
+          Add to Cart
+        </button>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ---------- Search Bar Logic ----------
