@@ -1,4 +1,4 @@
-const API_BASE = 'https://shopeasy-api-zeq2.onrender.com/api';
+const API_BASE = 'https://shopeasy-api-zeq2.onrender.com/api'; // Or 'http://localhost:5000/api' for local testing
 
 let allProducts = [];
 
@@ -28,6 +28,7 @@ function displayProducts(products) {
 
   grid.innerHTML = products.map(p => `
     <div class="product-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+      ${p.image ? `<img src="${p.image}" alt="${p.name}" style="width: 100%; height: 160px; object-fit: cover; border-radius: 6px;">` : ''}
       <h3 style="font-size: 18px; font-weight: 600;">${p.name}</h3>
       <p style="color: #4b5563; font-size: 14px;">${p.description || 'No description available.'}</p>
       <div style="font-weight: bold; color: #111827;">₹${p.price}</div>
@@ -38,7 +39,7 @@ function displayProducts(products) {
   `).join('');
 }
 
-// ---------- Search Bar Logic (Filters products as you type) ----------
+// ---------- Search Bar Logic ----------
 const searchInput = document.getElementById('searchInput');
 if (searchInput) {
   searchInput.addEventListener('input', (e) => {
