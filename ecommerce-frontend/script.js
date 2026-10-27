@@ -27,7 +27,6 @@ function displayProducts(products) {
   }
 
   grid.innerHTML = products.map(p => {
-    // Check for image or imageUrl properties, fallback to a placeholder if none exists
     const imgSrc = p.image || p.imageUrl || 'https://via.placeholder.com/300x160?text=No+Image';
 
     return `
