@@ -2,7 +2,15 @@ const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 const API_BASE = IS_LOCAL
   ? 'http://localhost:5000/api'
   : 'https://shopeasy-api-zeq2.onrender.com/api';
-const RAZORPAY_KEY_ID = 'rzp_test_TdvtILWPKwz4zp'; // replace with your actual Key ID
+const RAZORPAY_KEY_ID = 'rzp_test_TdvtILWPKwz4zp'; // public test key id (safe in frontend)
+
+// Placeholder image that works offline (no external site needed)
+const NO_IMAGE = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="140">' +
+  '<rect width="100%" height="100%" fill="#eeeeee"/>' +
+  '<text x="50%" y="50%" fill="#999999" font-family="sans-serif" font-size="14" ' +
+  'text-anchor="middle" dominant-baseline="middle">No Image</text></svg>'
+);
 
 // ---------- Navbar ----------
 function updateNavbar() {
@@ -212,6 +220,7 @@ function renderCart() {
     checkoutBtn.addEventListener('click', handleCheckout);
   }
 }
+
 // ---------- Checkout (Razorpay) ----------
 async function handleCheckout() {
   const token = localStorage.getItem('token');
@@ -385,70 +394,97 @@ async function loadMyOrders() {
   }
 }
 
-// ---------- Product listing ----------
-async function loadProducts() {
-  const grid = document.getElementById('productGrid');
-  if (!grid) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/products`);
-    const products = await res.json();
-
-    if (products.length === 0) {
-      grid.innerHTML = '<p>No products available yet.</p>';
-      return;
-    }
-
-    grid.innerHTML = products.map(p => `
-      <div class="product-card">
-        <img src="${p.imageUrl || 'https://via.placeholder.com/220x140?text=No+Image'}" alt="${p.name}">
-        <div class="product-name">${p.name}</div>
-        <div class="product-price">₹${p.price}</div>
-        <div class="product-stock">${p.stock > 0 ? p.stock + ' in stock' : 'Out of stock'}</div>
-        <button class="add-to-cart-btn" data-id="${p._id}" data-name="${p.name}" data-price="${p.price}">Add to Cart</button>
-      </div>
-    `).join('');
-
-    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        addToCart({
-          _id: btn.dataset.id,
-          name: btn.dataset.name,
-          price: Number(btn.dataset.price),
-        });
-        btn.textContent = 'Added ✓';
-        setTimeout(() => { btn.textContent = 'Add to Cart'; }, 1000);
-      });
-    });
-
-    initCardTilt();
-  } catch (err) {
-    grid.innerHTML = '<p>Could not load products. Is the backend server running?</p>';
-    console.error(err);
-  }
-}
-
-// ---------- 3D tilt effect on product cards ----------
+// ---------- 3D card tilt (this function was missing before) ----------
 function initCardTilt() {
   document.querySelectorAll('.product-card').forEach(card => {
     card.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-
-      const rotateX = ((y - centerY) / centerY) * -8;
-      const rotateY = ((x - centerX) / centerX) * 8;
-
-      card.style.transform = `perspective(700px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.03, 1.03, 1.03)`;
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      card.style.transform =
+        `perspective(800px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg)`;
     });
-
     card.addEventListener('mouseleave', () => {
-      card.style.transform = 'perspective(700px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      card.style.transform = '';
     });
   });
+}
+
+// ---------- Product listing + search ----------
+let allProducts = [];
+
+function renderProducts(products) {
+  const grid = document.getElementById('productGrid');
+  if (!grid) return;
+
+  if (products.length === 0) {
+    grid.innerHTML = '<p>No products match your search.</p>';
+    return;
+  }
+
+  grid.innerHTML = products.map(p => `
+    <div class="product-card">
+      <img src="${p.imageUrl || NO_IMAGE}" alt="${p.name}" onerror="this.onerror=null;this.src=NO_IMAGE">
+      <div class="product-name">${p.name}</div>
+      <div class="product-price">₹${p.price}</div>
+      <div class="product-stock">${p.stock > 0 ? p.stock + ' in stock' : 'Out of stock'}</div>
+      <button class="add-to-cart-btn" data-id="${p._id}" data-name="${p.name}" data-price="${p.price}">Add to Cart</button>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      addToCart({
+        _id: btn.dataset.id,
+        name: btn.dataset.name,
+        price: Number(btn.dataset.price),
+      });
+      btn.textContent = 'Added ✓';
+      setTimeout(() => { btn.textContent = 'Add to Cart'; }, 1000);
+    });
+  });
+
+  // A tilt problem must never wipe out the product grid
+  try {
+    initCardTilt();
+  } catch (err) {
+    console.error('Card tilt failed:', err);
+  }
+}
+
+function filterProducts() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filtered = allProducts.filter(p =>
+    [p.name, p.description, p.category].some(field => (field || '').toLowerCase().includes(q))
+  );
+  renderProducts(filtered);
+}
+
+async function loadProducts() {
+  const grid = document.getElementById('productGrid');
+  if (!grid) return;
+
+  let fetched;
+  try {
+    const res = await fetch(`${API_BASE}/products`);
+    fetched = await res.json();
+  } catch (err) {
+    grid.innerHTML = '<p>Could not load products. The server may be waking up, so please refresh in a moment.</p>';
+    console.error(err);
+    return;
+  }
+
+  allProducts = Array.isArray(fetched) ? fetched : [];
+
+  if (allProducts.length === 0) {
+    grid.innerHTML = '<p>No products available yet.</p>';
+    return;
+  }
+
+  renderProducts(allProducts);
+
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.addEventListener('input', filterProducts);
 }
 
 // ---------- Admin Panel ----------
@@ -487,7 +523,7 @@ async function loadAdminProducts() {
 
     listEl.innerHTML = products.map(p => `
       <div class="admin-product-row">
-        <img src="${p.imageUrl || 'https://via.placeholder.com/60x60?text=No+Image'}" alt="${p.name}">
+        <img src="${p.imageUrl || NO_IMAGE}" alt="${p.name}" onerror="this.onerror=null;this.src=NO_IMAGE">
         <div class="admin-product-info">
           <div class="admin-product-name">${p.name}</div>
           <div class="admin-product-meta">₹${p.price} · ${p.stock} in stock</div>
@@ -607,6 +643,164 @@ async function handleDeleteProduct(id) {
   }
 }
 
+// ---------- AI Shopping Assistant (floating chat widget) ----------
+let chatHistory = [];
+let chatBusy = false;
+
+function addChatMessage(role, text) {
+  const box = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg ' + (role === 'user' ? 'chat-user' : 'chat-bot');
+  msg.textContent = text; // textContent, never innerHTML (safe against injected HTML)
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+  return msg;
+}
+
+async function sendChatMessage() {
+  if (chatBusy) return;
+
+  const input = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('chatSend');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  addChatMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  chatHistory = chatHistory.slice(-10);
+
+  chatBusy = true;
+  sendBtn.disabled = true;
+  const thinking = addChatMessage('bot', 'Thinking…');
+
+  try {
+    const res = await fetch(`${API_BASE}/assistant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      thinking.textContent = data.message || 'Sorry, the assistant is unavailable right now.';
+      chatHistory.pop(); // drop the unanswered question so the history stays valid
+    } else {
+      thinking.textContent = data.reply;
+      chatHistory.push({ role: 'assistant', content: data.reply });
+      chatHistory = chatHistory.slice(-10);
+    }
+  } catch (err) {
+    thinking.textContent = 'Could not reach the server. It may be waking up, so please try again in a moment.';
+    chatHistory.pop();
+    console.error(err);
+  } finally {
+    chatBusy = false;
+    sendBtn.disabled = false;
+    const box = document.getElementById('chatMessages');
+    box.scrollTop = box.scrollHeight;
+    input.focus();
+  }
+}
+
+function initChatWidget() {
+  if (document.getElementById('chatToggle')) return; // already added
+
+  // Styles live here so only script.js needs to change
+  const style = document.createElement('style');
+  style.textContent = `
+    .chat-toggle {
+      position: fixed; right: 24px; bottom: 24px; z-index: 1000;
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      background: #1a1d23; color: #fff; font-size: 1.5rem; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3); transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .chat-toggle:hover { background: #e0a458; transform: scale(1.06); }
+    .chat-panel {
+      position: fixed; right: 24px; bottom: 92px; z-index: 1000;
+      width: 340px; max-width: calc(100vw - 32px); height: 460px; max-height: calc(100vh - 120px);
+      background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      display: none; flex-direction: column; overflow: hidden;
+    }
+    .chat-panel.open { display: flex; }
+    .chat-header {
+      background: #1a1d23; color: #e0a458; padding: 14px 16px; font-weight: 700;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .chat-close { background: none; border: none; color: #fff; font-size: 1.1rem; cursor: pointer; }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column;
+      gap: 10px; background: #f7f7f9;
+    }
+    .chat-msg {
+      max-width: 85%; padding: 9px 13px; border-radius: 12px; font-size: 0.9rem;
+      line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;
+    }
+    .chat-user { align-self: flex-end; background: #e0a458; color: #14161b; border-bottom-right-radius: 3px; }
+    .chat-bot { align-self: flex-start; background: #fff; color: #1a1a1a; border: 1px solid #e5e7eb; border-bottom-left-radius: 3px; }
+    .chat-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; background: #fff; }
+    .chat-form input {
+      flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem;
+    }
+    .chat-form input:focus { outline: 2px solid #e0a458; border-color: transparent; }
+    .chat-form button {
+      background: #1a1d23; color: #fff; border: none; padding: 0 16px; border-radius: 8px;
+      font-weight: 600; cursor: pointer;
+    }
+    .chat-form button:hover { background: #e0a458; color: #14161b; }
+    .chat-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .chat-note { font-size: 0.7rem; color: #9ca3af; text-align: center; padding: 0 10px 8px; background: #fff; }
+  `;
+  document.head.appendChild(style);
+
+  const toggle = document.createElement('button');
+  toggle.id = 'chatToggle';
+  toggle.className = 'chat-toggle';
+  toggle.type = 'button';
+  toggle.setAttribute('aria-label', 'Open shopping assistant');
+  toggle.textContent = '💬';
+
+  const panel = document.createElement('div');
+  panel.id = 'chatPanel';
+  panel.className = 'chat-panel';
+  panel.innerHTML = `
+    <div class="chat-header">
+      <span>ShopEasy Assistant</span>
+      <button type="button" class="chat-close" id="chatClose" aria-label="Close">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <form class="chat-form" id="chatForm">
+      <input type="text" id="chatInput" placeholder="Ask about our products..." maxlength="500" autocomplete="off">
+      <button type="submit" id="chatSend">Send</button>
+    </form>
+    <div class="chat-note">AI answers may be wrong. Please don't share personal details.</div>
+  `;
+
+  document.body.appendChild(toggle);
+  document.body.appendChild(panel);
+
+  let greeted = false;
+  toggle.addEventListener('click', () => {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) {
+      if (!greeted) {
+        addChatMessage('bot', 'Hi! I can help you find products. What are you looking for?');
+        greeted = true;
+      }
+      document.getElementById('chatInput').focus();
+    }
+  });
+
+  document.getElementById('chatClose').addEventListener('click', () => {
+    panel.classList.remove('open');
+  });
+
+  document.getElementById('chatForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    sendChatMessage();
+  });
+}
+
 // ---------- Init (runs once, on every page) ----------
 document.addEventListener('DOMContentLoaded', () => {
   updateNavbar();
@@ -615,6 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCart();
   loadMyOrders();
   initAdminPanel();
+  initChatWidget();
 
   const logoutLink = document.getElementById('logoutLink');
   if (logoutLink) {

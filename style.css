@@ -463,3 +463,18 @@ main {
   background: #dc2626;
   color: #fff;
 }
+.search-input {
+  width: 100%;
+  max-width: 480px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.search-input:focus {
+  outline: 2px solid #e0a458;
+  border-color: transparent;
+}
