@@ -1,6 +1,6 @@
 const hits = new Map();
 
-// Clean up old entries every 10 minutes
+// Clean up expired entries every 10 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of hits) {
@@ -17,11 +17,9 @@ const rateLimit = ({ windowMs, max }) => (req, res, next) => {
     hits.set(key, { count: 1, resetAt: now + windowMs });
     return next();
   }
-
   if (entry.count >= max) {
     return res.status(429).json({ message: 'Too many requests. Please wait a few minutes and try again.' });
   }
-
   entry.count += 1;
   next();
 };

@@ -1,9 +1,7 @@
 const Product = require('../models/Product');
 
-// Clean up common .env mistakes: quotes, spaces, and a leading "models/"
 const cleanName = (s) => s.trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
 
-// Primary model first, then optional backups (comma-separated in GEMINI_FALLBACK_MODELS)
 const MODELS = [
   process.env.GEMINI_MODEL || 'gemini-flash-latest',
   ...(process.env.GEMINI_FALLBACK_MODELS || '').split(','),
@@ -13,7 +11,6 @@ const MAX_MESSAGES = 10;
 const MAX_CHARS = 500;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Never trust the client: keep only valid roles, cap length and count
 function cleanMessages(raw) {
   if (!Array.isArray(raw)) return [];
   const cleaned = raw
@@ -25,56 +22,48 @@ function cleanMessages(raw) {
   return cleaned;
 }
 
-// Try each model; retry once if Google says it is overloaded (503)
 async function callGemini(body) {
-  let last = { status: 502, text: 'no model tried' };
-
+  const deadline = Date.now() + 30000; // give up after 30 seconds in total
+  let last = { status: 503, text: 'no model tried' };
   for (const model of MODELS) {
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': process.env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      if (response.ok) return { ok: true, data: await response.json() };
-
-      last = { status: response.status, text: await response.text() };
-      console.error(`Gemini error (model ${model}, attempt ${attempt}):`, last.status, last.text);
-
-      if (response.status === 503 && attempt === 1) {
-        await sleep(1500); // overloaded: wait briefly, retry the same model once
-        continue;
+      if (Date.now() > deadline) return { ok: false, ...last };
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(10000), // a hanging model can no longer block us
+          }
+        );
+        if (response.ok) return { ok: true, data: await response.json() };
+        last = { status: response.status, text: await response.text() };
+        console.error(`Gemini error (model ${model}, attempt ${attempt}):`, last.status, last.text);
+        if (response.status === 503 && attempt === 1) { await sleep(1500); continue; }
+        break; // try the next model
+      } catch (err) {
+        last = { status: 503, text: String((err && err.message) || err) };
+        console.error(`Gemini request failed (model ${model}, attempt ${attempt}):`, err && err.name, err && err.message);
+        break; // timeout or network error: try the next model
       }
-      break; // other errors or second 503: move on to the next model
     }
   }
   return { ok: false, ...last };
 }
 
-// @route POST /api/assistant
 const chat = async (req, res) => {
   try {
     if (!process.env.GEMINI_API_KEY) {
       return res.status(503).json({ message: 'The assistant is not configured yet.' });
     }
-
     const messages = cleanMessages(req.body.messages);
     if (!messages.length || messages[messages.length - 1].role !== 'user') {
       return res.status(400).json({ message: 'Please type a message.' });
     }
 
-    const products = await Product.find({})
-      .select('name price stock category description')
-      .limit(100)
-      .lean();
-
+    const products = await Product.find({}).select('name price stock category description').limit(100).lean();
     const catalog = products.map(p =>
       `- ${p.name} | ₹${p.price} | ${p.category || 'Uncategorized'} | ` +
       `${p.stock > 0 ? p.stock + ' in stock' : 'out of stock'} | ${p.description || ''}`
@@ -91,9 +80,8 @@ Rules:
 CATALOG:
 ${catalog || '(no products available yet)'}`;
 
-    // Gemini uses the role "model" instead of "assistant"
     const contents = messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
+      role: m.role === 'assistant' ? 'model' : 'user',   // Gemini uses "model"
       parts: [{ text: m.content }],
     }));
 
@@ -111,15 +99,12 @@ ${catalog || '(no products available yet)'}`;
     }
 
     const data = result.data;
-
     if (data.promptFeedback && data.promptFeedback.blockReason) {
       return res.json({ reply: 'Sorry, I can only help with questions about our products.' });
     }
-
     const parts = (data.candidates && data.candidates[0] && data.candidates[0].content &&
                    data.candidates[0].content.parts) || [];
     const reply = parts.map(p => p.text || '').join('').trim();
-
     res.json({ reply: reply || 'Sorry, I could not come up with an answer. Please try rephrasing.' });
   } catch (err) {
     console.error(err);
